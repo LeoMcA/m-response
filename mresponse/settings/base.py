@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "import_export",
     "webpack_loader",
+    "mresponse",
     "mresponse.applications",
     "mresponse.canned_response",
     "mresponse.documentation",
