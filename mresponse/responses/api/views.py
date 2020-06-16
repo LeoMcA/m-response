@@ -61,6 +61,7 @@ class ResponseMixin:
             )
             .not_moderated_by(self.request.user)
             .not_authored_by(self.request.user)
+            .not_active_application(self)
         )
 
         if self.request.user.profile.is_super_moderator:

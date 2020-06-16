@@ -91,6 +91,9 @@ class ResponseQuerySet(models.QuerySet):
             q |= self.language_q(lang)
         return self.filter(q)
 
+    def not_active_application(self):
+        return self.filter(review__application__is_archived=False)
+
 
 class ResponseAssignedToUserQuerySet(models.QuerySet):
     def expired(self):

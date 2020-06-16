@@ -16,9 +16,9 @@ class Review(generics.RetrieveAPIView):
     """
 
     queryset = (
-        reviews_models.Review.objects.responder_queue()
+        reviews_models.Review.objects.responder_queue().not_active_application()
         .select_related("application", "application_version", "response")
-        .filter(review_rating__lte=MAX_REVIEW_RATING)
+        .filter(review_rating__lte=MAX_REVIEW_RATING, application__is_archived=False)
     )
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = reviews_serializers.ReviewSerializer
