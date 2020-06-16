@@ -7,6 +7,7 @@ class Application(models.Model):
     package = models.CharField(
         max_length=255, help_text=_('E.g. "org.mozilla.firefox".'), unique=True
     )
+    is_archived = models.BooleanField(default=False)
 
     def __str__(self):
         return _("%(name)s (%(package)s)") % {
@@ -19,7 +20,6 @@ class ApplicationVersion(models.Model):
     application = models.ForeignKey("Application", models.PROTECT, related_name="+")
     name = models.CharField(max_length=255)
     code = models.IntegerField()
-    is_archived = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("application", "code")

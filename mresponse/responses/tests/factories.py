@@ -17,6 +17,10 @@ class ApplicationFactory(factory.django.DjangoModelFactory):
     package = "org.test.firefox"
 
 
+class ArchivedApplicationFactory(ApplicationFactory):
+    is_archived = True
+
+
 class ReviewFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Review
@@ -27,12 +31,20 @@ class ReviewFactory(factory.django.DjangoModelFactory):
     review_rating = 1
 
 
+class ArchivedReviewFactory(ReviewFactory):
+    application = factory.SubFactory(ArchivedApplicationFactory)
+
+
 class ResponseFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Response
 
     author = factory.SubFactory(UserFactory)
     review = factory.SubFactory(ReviewFactory)
+
+
+class ArchivedResponseFactory(ResponseFactory):
+    review = factory.SubFactory(ArchivedReviewFactory)
 
 
 class ResponseSerializerFactory(factory.Factory):
