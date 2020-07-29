@@ -1,28 +1,29 @@
+from datetime import timedelta
 from django.core.management.base import BaseCommand
-from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
+from django.utils.timezone import now
 
 from mresponse.reviews.models import Review
 from mresponse.reviews.api.views import MAX_REVIEW_RATING
-from mresponse.responses.models import Response
-from mresponse.moderations.models import Moderation
+
+User = get_user_model()
 
 
 class Command(BaseCommand):
-    def fetched_reviews(self, period=timezone.timedelta(hours=24)):
-        reviews = Review.objects.filter(
-            application__is_archived=False, last_modified__gte=timezone.now() - period
-        )
-        return reviews.count()
+    def fetched_reviews(self, period=timedelta()):
+        return Review.objects.filter(
+            application__is_archived=False, last_modified__gte=now() - period
+        ).count()
 
-    def responded_reviews(
-        self, language="en", period=timezone.timedelta(hours=72), since=None
-    ):
-        reviews = Review.objects.filter(
-            review_language=language,
+    def responded_reviews(self, language="", period=timedelta(), since=None):
+        reviews = Review.objects.select_related("response").filter(
             review_rating__lte=MAX_REVIEW_RATING,
             application__is_archived=False,
-            last_modified__lte=timezone.now() - period,
+            last_modified__lte=now() - period,
         )
+        if language:
+            reviews = reviews.filter(review_language=language)
         if since:
             reviews = reviews.filter(last_modified__gte=since)
 
@@ -39,46 +40,27 @@ class Command(BaseCommand):
             ):
                 responded_in_period_count += 1
 
-        if review_count == 0:
-            return 0
-
-        return responded_in_period_count / review_count
+        return responded_in_period_count / review_count if review_count else 0
 
     def active_contributors(
-        self,
-        required_responses=5,
-        required_moderations=15,
-        period=timezone.timedelta(days=7),
+        self, required_responses=0, required_moderations=0, period=timedelta(),
     ):
-        users = {}
-        contributor_count = 0
-
-        since = timezone.now() - period
-        responses = Response.objects.filter(submitted_at__gte=since)
-        moderations = Moderation.objects.filter(submitted_at__gte=since)
-
-        for response in responses.iterator():
-            author = response.author_id
-            if author in users:
-                users[author]["responses"] += 1
-            else:
-                users[author] = {"responses": 1, "moderations": 0}
-
-        for moderation in moderations.iterator():
-            moderator = moderation.moderator_id
-            if moderator in users:
-                users[moderator]["moderations"] += 1
-            else:
-                users[moderator] = {"responses": 0, "moderations": 1}
-
-        for user in users.values():
-            if (
-                user["responses"] >= required_responses
-                and user["moderations"] >= required_moderations
-            ):
-                contributor_count += 1
-
-        return contributor_count
+        since = now() - period
+        return (
+            User.objects.annotate(
+                responses_count=Count(
+                    "responses", filter=Q(responses__submitted_at__gte=since)
+                ),
+                moderations_count=Count(
+                    "moderations", filter=Q(moderations__submitted_at__gte=since)
+                ),
+            )
+            .filter(
+                responses_count__gte=required_responses,
+                moderations_count__gte=required_moderations,
+            )
+            .count()
+        )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -122,12 +104,10 @@ class Command(BaseCommand):
         )
 
     def generate_report(self, options):
-        report = "Report generated at {}:\n".format(timezone.now())
-        report += "Responses fetched in the past {} hours: {}\n".format(
+        report = "Report generated at {}:\n".format(now())
+        report += "Responses fetched which were posted in the past {} hours: {}\n".format(
             options["fetched_hours"],
-            self.fetched_reviews(
-                period=timezone.timedelta(hours=options["fetched_hours"])
-            ),
+            self.fetched_reviews(period=timedelta(hours=options["fetched_hours"])),
         )
         for language in options["responded_languages"]:
             report += "Responses in {} responded to within {} hours: {:.1%}\n".format(
@@ -135,7 +115,7 @@ class Command(BaseCommand):
                 options["responded_hours"],
                 self.responded_reviews(
                     language=language,
-                    period=timezone.timedelta(hours=options["responded_hours"]),
+                    period=timedelta(hours=options["responded_hours"]),
                 ),
             )
         report += "Active contributors (at least {} responses and {} moderations) in the past {} days: {}\n".format(
@@ -145,7 +125,7 @@ class Command(BaseCommand):
             self.active_contributors(
                 required_responses=options["contribute_responses"],
                 required_moderations=options["contribute_moderations"],
-                period=timezone.timedelta(days=options["contribute_days"]),
+                period=timedelta(days=options["contribute_days"]),
             ),
         )
         return report

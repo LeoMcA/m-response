@@ -19,7 +19,7 @@ class TestFetchedReviews(TestCase):
         ReviewFactory()
         ArchivedReviewFactory()
 
-        result = Command().fetched_reviews()
+        result = Command().fetched_reviews(period=timedelta(hours=1))
         self.assertEqual(result, 1)
 
     def test_outside_period(self):
@@ -121,7 +121,7 @@ class TestActiveContributors(TestCase):
         ResponseFactory(author=user2)
 
         result = Command().active_contributors(
-            required_responses=2, required_moderations=0
+            required_responses=2, required_moderations=0, period=timedelta(hours=1)
         )
         self.assertEqual(result, 1)
 
@@ -134,7 +134,7 @@ class TestActiveContributors(TestCase):
         ModerationFactory(response=ResponseFactory(), moderator=user2)
 
         result = Command().active_contributors(
-            required_responses=0, required_moderations=2
+            required_responses=0, required_moderations=2, period=timedelta(hours=1)
         )
         self.assertEqual(result, 1)
 
