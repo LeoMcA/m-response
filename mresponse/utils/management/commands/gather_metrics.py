@@ -1,11 +1,12 @@
 from datetime import timedelta
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Prefetch
 from django.utils.timezone import now
 
 from mresponse.reviews.models import Review
 from mresponse.reviews.api.views import MAX_REVIEW_RATING
+from mresponse.responses.models import Response
 
 User = get_user_model()
 
@@ -17,10 +18,17 @@ class Command(BaseCommand):
         ).count()
 
     def responded_reviews(self, language="", period=timedelta(), since=None):
-        reviews = Review.objects.select_related("response").filter(
+        reviews = Review.objects.filter(
             review_rating__lte=MAX_REVIEW_RATING,
             application__is_archived=False,
             last_modified__lte=now() - period,
+        ).prefetch_related(
+            Prefetch(
+                "responses",
+                queryset=Response.objects.filter(
+                    submitted_to_play_store_at__isnull=False
+                ),
+            )
         )
         if language:
             reviews = reviews.filter(review_language=language)
@@ -30,13 +38,12 @@ class Command(BaseCommand):
         review_count = 0
         responded_in_period_count = 0
 
-        for review in reviews.iterator():
+        for review in reviews:
             review_count += 1
+            response = review.responses.first()
             if (
-                hasattr(review, "response")
-                and review.response.submitted_to_play_store
-                and review.response.submitted_to_play_store_at - review.last_modified
-                <= period
+                response
+                and response.submitted_to_play_store_at - review.last_modified <= period
             ):
                 responded_in_period_count += 1
 

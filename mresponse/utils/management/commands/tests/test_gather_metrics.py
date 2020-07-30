@@ -110,6 +110,22 @@ class TestRespondedReviews(TestCase):
         result = Command().responded_reviews(period=timedelta(hours=1))
         self.assertEqual(result, 1)
 
+    def test_handles_rejected_responses(self):
+        review = self.review()
+        self.response(review=review, submitted_to_play_store=False, rejected=True)
+        self.response(review=review, submitted_to_play_store=True)
+
+        result = Command().responded_reviews(period=timedelta(hours=1))
+        self.assertEqual(result, 1)
+
+    def test_doesnt_fail_with_no_submitted_to_play_store_at(self):
+        response = self.response(submitted_to_play_store=True)
+        response.submitted_to_play_store_at = None
+        response.save()
+
+        result = Command().responded_reviews(period=timedelta(hours=1))
+        self.assertEqual(result, 0)
+
 
 class TestActiveContributors(TestCase):
     def test_required_responses(self):
